@@ -1,8 +1,19 @@
-import { Form, useLoaderData } from "react-router-dom";
-import { getContact } from "../contacts";
+import { Form, useFetcher, useLoaderData } from "react-router-dom";
+import { getContact, updateContact } from "../contacts";
+
+export async function action({ request, params }) {
+  let formData = await request.formData();
+  return updateContact(params.contactId, { favorite: formData.get("favorite") === "true" });
+}
 
 export async function loader({ params }) {
   const contact = await getContact(params.contactId);
+  if (!contact) {
+    throw new Response("", {
+      status: 404,
+      statusText: "Not Found",
+    });
+  }
   return { contact };
 }
 
@@ -59,10 +70,18 @@ export default function Contact() {
 }
 
 function Favorite({ contact }) {
-  // yes, this is a `let` for later
+  const fetcher = useFetcher();
   let favorite = contact.favorite;
+  // !: Optimistic UI. Will update the favorite to improve experience
+  // but if the update fails it will revert the UI to its real data.
+  if (fetcher.formData) {
+    favorite = fetcher.formData.get("favorite") === "true";
+  }
+
+  // !: the fetcher.Form works almost exactly like the <Form> with the difference
+  // that it is not a navigation. The URL will not change and the history stack is unaffected.
   return (
-    <Form method="post">
+    <fetcher.Form method="post">
       <button
         name="favorite"
         value={favorite ? "false" : "true"}
@@ -70,6 +89,6 @@ function Favorite({ contact }) {
       >
         {favorite ? "★" : "☆"}
       </button>
-    </Form>
+    </fetcher.Form>
   );
 }
